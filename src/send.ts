@@ -139,13 +139,12 @@ async function main() {
   const apiKey = requireEnv('MANDRILL_API_KEY')
   const toEmail = requireEnv('TO_EMAIL')
   const fromEmail = requireEnv('FROM_EMAIL')
+  const filename = process.env['FILE_NAME'] ?? 'sample.pdf'
 
   const client = new MandrillClient({
     apiKey,
     templates: MandrillTemplateDefaults,
   })
-
-  const filename = 'sample.pdf'
 
   const mergeVars: TemplateContent[] = [
     { name: 'name', content: 'Repro User' },
@@ -161,7 +160,9 @@ async function main() {
 
   const pdfPath = resolve(__dirname, '..', 'sample.pdf')
   const stream = createReadStream(pdfPath)
-  const pdfBase64 = await convertStreamToBase64(stream)
+  
+  const pdfBase64Raw = await convertStreamToBase64(stream)
+  const pdfBase64 = pdfBase64Raw.match(/.{1,76}/g)!.join('\r\n')
 
   const response = await client.sendEmail({
     attachments: [
@@ -176,7 +177,7 @@ async function main() {
     metadata: {
       attemptId: 'repro',
     },
-    subject: 'Mandrill PDF repro',
+    subject: `Mandrill PDF repro - ${Date.now()}`,
     templateName: MandrillTemplates.DOCUMENT_FORWARD,
     toEmail,
   })

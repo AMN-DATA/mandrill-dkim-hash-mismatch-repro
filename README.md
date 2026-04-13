@@ -42,13 +42,18 @@ Please share:
 nvm use
 npm install
 cp .env.example .env
-# edit .env and fill in MANDRILL_API_KEY, TO_EMAIL, FROM_EMAIL
+# edit .env and fill in MANDRILL_API_KEY, TO_EMAIL
 ```
+
+Optionally modify `FILE_NAME` in `.env` file depending on the test scenario.
+
+- sample.pdf - small file around 500 bytes _vs_
+- sample-large.pdf - large file around 500KB
 
 ## Run
 
 ```sh
-npm start
+npm send
 ```
 
 The script will:
@@ -62,5 +67,6 @@ The script will:
 
 - `src/send.ts` — single-file reproduction.
 - `sample.pdf` — small bundled PDF used as the attachment.
+- `sample-large.pdf` — medium size bundled PDF used as the attachment. (~500KB)
 - `package.json` — pinned deps: `@mailchimp/mailchimp_transactional@1.4.1`,
   `typescript@5.9.3`, `@types/node@22.19.17`.

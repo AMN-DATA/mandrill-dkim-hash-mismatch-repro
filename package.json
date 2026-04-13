@@ -8,7 +8,7 @@
   },
   "scripts": {
     "build": "tsc",
-    "start": "node --env-file=.env dist/send.js"
+    "send": "node --env-file=.env dist/send.js"
   },
   "dependencies": {
     "@mailchimp/mailchimp_transactional": "1.4.1",

@@ -1,0 +1,22 @@
+{
+  "name": "mandrill-dkim-hash-mismatch-repro",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Minimal reproduction for DKIM hash mismatch on Mandrill (Mailchimp Transactional) sendTemplate with PDF attachment.",
+  "engines": {
+    "node": "^22.0.0"
+  },
+  "scripts": {
+    "build": "tsc",
+    "start": "build && node --experimental-strip-types --env-file=.env dist/send.js"
+  },
+  "dependencies": {
+    "@mailchimp/mailchimp_transactional": "1.4.1"
+  },
+  "devDependencies": {
+    "@types/mailchimp__mailchimp_transactional": "1.0.11",
+    "@types/node": "22.19.17",
+    "typescript": "5.9.3"
+  }
+}

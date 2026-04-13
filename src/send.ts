@@ -1,11 +1,23 @@
-import { readFileSync } from 'node:fs'
-import { dirname, resolve } from 'node:path'
-import { fileURLToPath } from 'node:url'
-import Mailchimp, {
-  type MergeVar,
-} from '@mailchimp/mailchimp_transactional'
+import Mailchimp, { ApiClient, MergeVar, MessagesSendResponse, type TemplateContent } from '@mailchimp/mailchimp_transactional'
+import { AxiosError } from 'axios'
+import { createReadStream } from 'node:fs'
+import { resolve } from 'node:path'
+import { type Readable } from 'node:stream'
 
-const __dirname = dirname(fileURLToPath(import.meta.url))
+/**
+ * Mirrors our S3 based `convertStreamToBase64`
+ * 
+ * so the attachment bytes take the same Buffer-chunks -> Buffer.concat -> base64
+ * path as real S3 downloads.
+ */
+function convertStreamToBase64(stream: Readable): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const chunks: Buffer[] = []
+    stream.on('data', (chunk: Buffer) => chunks.push(chunk))
+    stream.on('end', () => resolve(Buffer.concat(chunks).toString('base64')))
+    stream.on('error', reject)
+  })
+}
 
 function requireEnv(name: string): string {
   const value = process.env[name]
@@ -16,82 +28,161 @@ function requireEnv(name: string): string {
   return value
 }
 
+enum MandrillTemplates {
+  DOCUMENT_FORWARD = 'documentForward',
+  DOCUMENT_FORWARD_FAILURE = 'documentForwardFailure',
+  INTEGRATIONS_DOCUMENT_FORWARD = 'integrationsDocumentForward',
+}
+
+const MandrillTemplateDefaults = {
+  [MandrillTemplates.DOCUMENT_FORWARD]: 'autoforwarding',
+  [MandrillTemplates.DOCUMENT_FORWARD_FAILURE]: 'mail-autoforwarding-04-2020',
+  [MandrillTemplates.INTEGRATIONS_DOCUMENT_FORWARD]:
+    'integrations-autoforwarding',
+}
+
+export interface ConfigMandrill {
+  apiKey: string
+  templates: {
+    [MandrillTemplates.DOCUMENT_FORWARD]: string
+    [MandrillTemplates.DOCUMENT_FORWARD_FAILURE]: string
+    [MandrillTemplates.INTEGRATIONS_DOCUMENT_FORWARD]: string
+  }
+}
+
+function isAxiosError<T>(result: AxiosError | T): result is AxiosError {
+  return result instanceof AxiosError
+}
+
+interface Attachment {
+  /**
+   * base64 encoded content of the attachment.
+   */
+  content: string
+  contentType?: string
+  filename: string
+}
+
+/**
+ * Wrapped mailchimp transactional client interface
+ */
+export class MandrillClient {
+  private client: ApiClient
+
+  constructor(private options: ConfigMandrill) {
+    this.client = Mailchimp(options.apiKey)
+  }
+
+  /**
+   * Send an email using a Mandrill template to a single recipient.
+   *
+   * @see https://mailchimp.com/developer/transactional/api/messages/send-using-message-template/
+   */
+  async sendEmail({
+    attachments,
+    environment,
+    fromEmail,
+    mergeVars,
+    metadata,
+    subject,
+    templateName,
+    toEmail,
+  }: {
+    attachments?: Attachment[]
+    environment: string
+    fromEmail: string
+    mergeVars: MergeVar[]
+    metadata?: Record<string, string>
+    subject: string
+    templateName: MandrillTemplates
+    toEmail: string
+  }): Promise<MessagesSendResponse> {
+    const result = await this.client.messages.sendTemplate({
+      message: {
+        attachments: attachments?.map(attachment => ({
+          content: attachment.content,
+          name: attachment.filename,
+          type: attachment.contentType ?? 'application/pdf',
+        })),
+        from_email: fromEmail,
+        merge_vars: [
+          {
+            rcpt: toEmail,
+            vars: mergeVars,
+          },
+        ],
+        metadata: {
+          ...metadata,
+          environment,
+          website: 'https://www.caya.com',
+        },
+        subject,
+        to: [
+          {
+            email: toEmail,
+          },
+        ],
+      },
+      template_content: [],
+      template_name: this.options.templates[templateName],
+    })
+
+    if (isAxiosError(result)) {
+      throw result
+    }
+
+    return result?.[0]
+  }
+}
+
 async function main() {
   const apiKey = requireEnv('MANDRILL_API_KEY')
   const toEmail = requireEnv('TO_EMAIL')
   const fromEmail = requireEnv('FROM_EMAIL')
 
-  const pdfPath = resolve(__dirname, '..', 'sample.pdf')
-  const pdfBuffer = readFileSync(pdfPath)
-  const pdfBase64 = pdfBuffer.toString('base64')
+  const client = new MandrillClient({
+    apiKey,
+    templates: MandrillTemplateDefaults,
+  })
+
   const filename = 'sample.pdf'
 
-  const templateName = 'autoforwarding'
-  const subject = 'Mandrill PDF repro'
-
-  const mergeVars: MergeVar[] = [
+  const mergeVars: TemplateContent[] = [
     { name: 'name', content: 'Repro User' },
     { name: 'accountEmail', content: 'repro@example.com' },
     { name: 'filename', content: filename },
     { name: 'documentCreatedAt', content: '13.04.2026' },
     { name: 'documentSenderName', content: 'Repro Sender' },
     { name: 'documentSubject', content: 'Repro Subject' },
-    { name: 'documentTags', content: ['REPRO'] as unknown as string },
+    { name: 'documentTags', content: ['REPRO'].map(tag =>
+        tag.toUpperCase()
+      ) as unknown as string, },
   ]
 
-  const payload = {
-    message: {
-      attachments: [
-        {
-          content: pdfBase64,
-          name: filename,
-          type: 'application/pdf',
-        },
-      ],
-      from_email: fromEmail,
-      merge_vars: [{ rcpt: toEmail, vars: mergeVars }],
-      metadata: {
-        attemptId: 'repro',
-        environment: 'repro',
-        website: 'https://www.caya.com',
+  const pdfPath = resolve(__dirname, '..', 'sample.pdf')
+  const stream = createReadStream(pdfPath)
+  const pdfBase64 = await convertStreamToBase64(stream)
+
+  const response = await client.sendEmail({
+    attachments: [
+      {
+        content: pdfBase64,
+        filename,
       },
-      subject,
-      to: [{ email: toEmail }],
+    ],
+    environment: 'production',
+    fromEmail,
+    mergeVars,
+    metadata: {
+      attemptId: 'repro',
     },
-    template_content: [] as { name: string; content: string }[],
-    template_name: templateName,
-  }
-
-  console.log('--- Mandrill sendTemplate parameters ---')
-  console.log('template_name:', payload.template_name)
-  console.log('template_content:', payload.template_content)
-  console.log('message.from_email:', payload.message.from_email)
-  console.log('message.to:', payload.message.to)
-  console.log('message.subject:', payload.message.subject)
-  console.log('message.metadata:', payload.message.metadata)
-  console.log(
-    'message.merge_vars:',
-    JSON.stringify(payload.message.merge_vars, null, 2)
-  )
-  console.log('message.attachments (metadata only):', [
-    {
-      name: payload.message.attachments[0].name,
-      type: payload.message.attachments[0].type,
-      contentBytes: pdfBuffer.byteLength,
-      contentBase64Length: pdfBase64.length,
-    },
-  ])
-  console.log('----------------------------------------')
-
-  const client = Mailchimp(apiKey)
-  const response = await client.messages.sendTemplate(payload)
+    subject: 'Mandrill PDF repro',
+    templateName: MandrillTemplates.DOCUMENT_FORWARD,
+    toEmail,
+  })
 
   console.log('--- Mandrill response ---')
   console.log(JSON.stringify(response, null, 2))
-
-  if (Array.isArray(response) && response[0]?._id) {
-    console.log('Mandrill message _id:', response[0]._id)
-  }
 }
 
 main().catch(error => {

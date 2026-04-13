@@ -38,7 +38,7 @@ Please share:
 
 ## Setup
 
-```sh
+```bash
 nvm use
 npm install
 cp .env.example .env
@@ -52,8 +52,8 @@ Optionally modify `FILE_NAME` in `.env` file depending on the test scenario.
 
 ## Run
 
-```sh
-npm send
+```bash
+npm run send
 ```
 
 The script will:

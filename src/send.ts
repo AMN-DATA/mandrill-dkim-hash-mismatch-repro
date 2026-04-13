@@ -161,8 +161,14 @@ async function main() {
   const pdfPath = resolve(__dirname, '..', 'sample.pdf')
   const stream = createReadStream(pdfPath)
   
-  const pdfBase64Raw = await convertStreamToBase64(stream)
-  const pdfBase64 = pdfBase64Raw.match(/.{1,76}/g)!.join('\r\n')
+
+  const pdfBase64 = await convertStreamToBase64(stream)
+
+  // Below workaround on our side is working. 
+  // However, we are not sure if there are any implications with this.
+  
+  // const pdfBase64Raw = await convertStreamToBase64(stream)
+  // const pdfBase64 = pdfBase64Raw.match(/.{1,76}/g)!.join('\r\n')
 
   const response = await client.sendEmail({
     attachments: [

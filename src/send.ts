@@ -158,7 +158,7 @@ async function main() {
       ) as unknown as string, },
   ]
 
-  const pdfPath = resolve(__dirname, '..', 'sample.pdf')
+  const pdfPath = resolve(__dirname, '..', filename)
   const stream = createReadStream(pdfPath)
   
 

@@ -164,9 +164,7 @@ async function main() {
 
   const pdfBase64 = await convertStreamToBase64(stream)
 
-  // Below workaround on our side is working. 
-  // However, we are not sure if there are any implications with this.
-  
+  // We have tried the below workaround but still mandrill replacing the lines
   // const pdfBase64Raw = await convertStreamToBase64(stream)
   // const pdfBase64 = pdfBase64Raw.match(/.{1,76}/g)!.join('\r\n')
 

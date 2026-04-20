@@ -216,3 +216,12 @@ DKIM signer runs before this re-fold, `bh=` is computed over the un-folded
 body and no longer matches the delivered body. A fix would be to either
 (a) keep RFC 2045 76-char wrapping without a leading SP on continuation lines,
 or (b) re-sign after any post-processing that mutates body bytes.
+
+## Observe the same behavior with the `send-raw`
+
+We have also tried to overcome this by sending MIME content directly using `templates.sendRaw` API. 
+However, we saw the same behavior with this API as well.
+
+Refer to `send-raw.ts` for the relevant code.
+
+You can also test the same by using `npm run send-raw`.

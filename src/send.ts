@@ -164,7 +164,7 @@ async function main() {
 
   const pdfBase64 = await convertStreamToBase64(stream)
 
-  // We have tried the below workaround but still mandrill replacing the lines
+  // We have tried the below workaround but still mandrill is replacing the lines
   // const pdfBase64Raw = await convertStreamToBase64(stream)
   // const pdfBase64 = pdfBase64Raw.match(/.{1,76}/g)!.join('\r\n')
 
@@ -179,7 +179,7 @@ async function main() {
     fromEmail,
     mergeVars,
     metadata: {
-      attemptId: 'repro',
+      attemptId: `repro-${Date.now()}`,
     },
     subject: `Mandrill PDF repro - ${Date.now()}`,
     templateName: MandrillTemplates.DOCUMENT_FORWARD,

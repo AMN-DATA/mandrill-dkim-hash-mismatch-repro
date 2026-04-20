@@ -8,15 +8,18 @@
   },
   "scripts": {
     "build": "tsc",
-    "send": "node --env-file=.env dist/send.js"
+    "send": "node --env-file=.env dist/send.js",
+    "send-raw": "node --env-file=.env dist/send-raw.js"
   },
   "dependencies": {
     "@mailchimp/mailchimp_transactional": "1.4.1",
-    "axios": "1.14.0"
+    "axios": "1.14.0",
+    "nodemailer": "8.0.5"
   },
   "devDependencies": {
     "@types/mailchimp__mailchimp_transactional": "1.0.11",
     "@types/node": "22.19.17",
+    "@types/nodemailer": "8.0.0",
     "typescript": "5.9.3"
   }
 }
